@@ -14,7 +14,9 @@ networks.
 \item Several networks as (optionally named) arguments.
 \item A single network, a character vector, and several optional
 arguments. Then, the layers are values of the named edge
-attributes. The optional arguments \code{.symmetric} and
+attributes. If the vector has named elements (e.g.,
+\code{c(a="advice", c="collaboration")}), the layers will be
+renamed accordingly. The optional arguments \code{.symmetric} and
 \code{.bipartite} are then interpreted as described below.
 }}
 
@@ -90,6 +92,13 @@ listed operators are implemented, as well as functions \code{\link{abs}},
 \link[base:Syntax]{operator precedence} applies, so use of parentheses is
 recommended to ensure the logical expression is what it looks like.
 
+\strong{Important:} For performance reasons, \pkg{ergm.multi}'s
+Layer Logic implementation uses integer arithmetic. This means, in
+particular, that \code{/} will round down instead of returning a
+fraction (as \code{\%/\%} does in \R), and \code{\link[=round]{round()}} function without a
+second argument (which can be negative to round to the nearest 10,
+100, etc.) is not meaningful and will be ignored.
+
 For example, if LHS is \code{Layer(A=nwA, B=nwB)}, both \code{~`2`} and
 \code{~B} refer to \code{nwB}, while \code{A&!B} refers to a
 \dQuote{logical} layer that has ties that are in \code{nwA} but not in
@@ -131,11 +140,12 @@ ergm(flo ~ L(~edges, ~m)+L(~edges, ~b))
 flo <- Layer(m = flomarriage, b = flobusiness)
 ergm(flo ~ L(~edges, ~m)+L(~edges, ~b))
 
-# Method 3: edge attributes:
+# Method 3: edge attributes (also illustrating renaming):
 flo <- flomarriage | flobusiness
-flo[,, names.eval="m"] <- as.matrix(flomarriage)
-flo[,, names.eval="b"] <- as.matrix(flobusiness)
-flo <- Layer(flo, c("m","b"))
+flo[,, names.eval="marriage"] <- as.matrix(flomarriage)
+flo[,, names.eval="business"] <- as.matrix(flobusiness)
+flo # edge attributes
+flo <- Layer(flo, c(m="marriage", b="business"))
 ergm(flo ~ L(~edges, ~m)+L(~edges, ~b))
 
 ### Specifying modes and mixed bipartitedness

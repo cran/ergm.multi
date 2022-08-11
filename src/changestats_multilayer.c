@@ -15,7 +15,6 @@
 
 I_CHANGESTAT_FN(i__layer_net){
   int *iinputs = IINPUT_PARAM;
-  double *inputs = INPUT_PARAM;
   ALLOC_AUX_STORAGE(1, StoreLayerLogic, ll);
   ll->nl = *(iinputs++);
   ll->inwp = nwp;
@@ -54,8 +53,22 @@ I_CHANGESTAT_FN(i__layer_net){
   
   /* Set up the layer logic. */
 
-  ll->commands = inputs;
-  ll->stacks = Calloc(2*ll->commands[0], double);
+  ll->commands = iinputs;
+  ll->stacks = Calloc(2*ll->commands[0], int);
+
+  /* Figure out if this layer needs to calculate reciprocal toggles. */
+
+  ll->need_ht = FALSE;
+  if(DIRECTED){
+    for(unsigned int i=1; i<=*ll->commands; i++){
+      int com = ll->commands[i];
+      if(com == -21 || // If t() is ever used, or
+         (ll->symm && com > 0 && ll->symm[com])){ // any symmetrized layers are referenced,
+        ll->need_ht = TRUE; // then toggle (t,h) somewhere may affect dyad (h,t) in this layer.
+        break;
+      }
+    }
+  }
 
   /* Construct the output (logical layer) network: */  
 
@@ -115,7 +128,7 @@ F_CHANGESTAT_FN(f__layer_net){
 
 I_CHANGESTAT_FN(i_OnLayer){
   
-  unsigned int nml = *INPUT_PARAM; // Number of layers *in the term*.
+  unsigned int nml = *IINPUT_PARAM; // Number of layers *in the term*.
 
   ALLOC_STORAGE(nml, Model*, ms);
 
@@ -129,8 +142,8 @@ I_CHANGESTAT_FN(i_OnLayer){
 
 C_CHANGESTAT_FN(c_OnLayer){
   GET_STORAGE(Model*, ms);
-  unsigned int nml = *INPUT_PARAM;
-  double *w = INPUT_PARAM+1;
+  unsigned int nml = *IINPUT_PARAM;
+  double *w = INPUT_PARAM;
 
   // Find the affected models.
   for(unsigned int ml=0; ml < nml; ml++){
@@ -147,8 +160,8 @@ C_CHANGESTAT_FN(c_OnLayer){
 
 Z_CHANGESTAT_FN(z_OnLayer){
   GET_STORAGE(Model*, ms);
-  unsigned int nml = *INPUT_PARAM;
-  double *w = INPUT_PARAM+1;
+  unsigned int nml = *IINPUT_PARAM;
+  double *w = INPUT_PARAM;
 
   // Find the affected models.
   for(unsigned int ml=0; ml < nml; ml++){
@@ -161,7 +174,7 @@ Z_CHANGESTAT_FN(z_OnLayer){
 
 F_CHANGESTAT_FN(f_OnLayer){
   GET_STORAGE(Model*, ms);
-  unsigned int nml = *INPUT_PARAM;
+  unsigned int nml = *IINPUT_PARAM;
   for(unsigned int ml=0; ml<nml; ml++){
     GET_AUX_STORAGE_NUM(StoreLayerLogic, ll, ml);
     ModelDestroy(ll->onwp, ms[ml]);
@@ -171,22 +184,35 @@ F_CHANGESTAT_FN(f_OnLayer){
 /* layerCMB: Conway-Maxwell-Binomial for the sum of layer combinations */
 
 C_CHANGESTAT_FN(c_layerCMB){
-  unsigned int nml = *INPUT_PARAM;
+  unsigned int nml = *IINPUT_PARAM;
 
   // FIXME: Cache current values, perhaps via a valued auxiliary?
 
   unsigned int oldct_th=0, newct_th=0,
     oldct_ht=0, newct_ht=0;
+
+  /* Determine whether we need to check the reciprocating dyads. */
+  Rboolean need_ht = FALSE;
+  for(unsigned int ml=0; ml < nml; ml++){
+    GET_AUX_STORAGE_NUM(StoreLayerLogic, ll, ml);
+    if(ll->need_ht){
+      need_ht = TRUE;
+      break;
+    }
+  }
+
   for(unsigned int ml=0; ml < nml; ml++){
     GET_AUX_STORAGE_NUM(StoreLayerLogic, ll, ml);
     Vertex lt = ML_IO_TAIL(ll, tail), lh = ML_IO_HEAD(ll, head);
     unsigned int v = ergm_LayerLogic2(lt, lh, tail, head, ll, 2);
     if(v&1) oldct_th++; // Pre-toggle edge present.
     if(v&2) newct_th++; // Post-toggle edge present.
-    
-    v = ergm_LayerLogic2(lh, lt, tail, head, ll, 2);
-    if(v&1) oldct_ht++; // Pre-toggle edge present.
-    if(v&2) newct_ht++; // Post-toggle edge present.
+
+    if(need_ht){
+      v = ergm_LayerLogic2(lh, lt, tail, head, ll, 2);
+      if(v&1) oldct_ht++; // Pre-toggle edge present.
+      if(v&2) newct_ht++; // Post-toggle edge present.
+    }
   }
   
   CHANGE_STAT[0] =

@@ -15,7 +15,7 @@ ergm_LayerLogic(formula, namemap = NULL)
 \arguments{
 \item{formula}{A Layer Logic formula.}
 
-\item{namemap}{A character vector giving the names, of the layers
+\item{namemap}{A character vector giving the names of the layers
 referenced, or \code{NULL}.}
 
 \item{x}{An \code{ergm_LayerLogic} object.}
@@ -32,11 +32,11 @@ Internal representation of Layer Logic
 }
 \section{Methods (by generic)}{
 \itemize{
-\item \code{toString}: A method to generate coefficient names
+\item \code{toString(ergm_LayerLogic)}: A method to generate coefficient names
 associated with the Layer Logic.
 
-\item \code{to_ergm_Cdouble}: A method to encode and serialize the
+\item \code{to_ergm_Cdouble(ergm_LayerLogic)}: A method to encode and serialize the
 Layer Logic into a postfix program understood by the C code.
-}}
 
+}}
 \keyword{internal}

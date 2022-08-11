@@ -348,7 +348,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">Reproducing Goeyvaerts et al. (2018) using <code>ergm.multi</code></h1>
 <h4 class="author">Pavel N. Krivitsky</h4>
-<h4 class="date"><code>ergm.multi</code> version 0.1.0 (2022-07-03)</h4>
+<h4 class="date"><code>ergm.multi</code> version 0.1.1 (2022-08-11)</h4>
 
 
 
@@ -367,7 +367,7 @@ pre {
 <div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">data</span>(Goeyvaerts)</span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="kw">length</span>(Goeyvaerts)</span></code></pre></div>
 <pre><code>## [1] 318</code></pre>
-<p>An explanation of the networks, including a list of their network (<code>%n%</code>) and vertex (<code>%v%</code>) attributes, can be obtained via <code>?Goeyvaerts</code>. A total of 318 complete networks were collected, then two more excluded due to “nonstandard” family composition:</p>
+<p>An explanation of the networks, including a list of their network (<code>%n%</code>) and vertex (<code>%v%</code>) attributes, can be obtained via <code>?Goeyvaerts</code>. A total of 318 complete networks were collected, then two were excluded due to “nonstandard” family composition:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a>Goeyvaerts <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">discard</span>(<span class="st">`</span><span class="dt">%n%</span><span class="st">`</span>, <span class="st">&quot;included&quot;</span>) <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">map</span>(as_tibble, <span class="dt">unit=</span><span class="st">&quot;vertices&quot;</span>)</span></code></pre></div>
 <pre><code>## [[1]]
 ## # A tibble: 4 × 5

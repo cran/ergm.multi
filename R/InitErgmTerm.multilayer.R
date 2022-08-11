@@ -81,7 +81,7 @@
 #' }
 #'
 #' Filtering arguments are specified the same way as attribute
-#' arguments, but they must be named arguments (i.e., must be passed
+#' arguments, but they must be unnamed arguments (i.e., must be passed
 #' without the `=`) and must return a logical or numeric vector
 #' suitable for indexing the edge list. Multiple filtering arguments
 #' may be specified, and the edge will be kept if it satisfies
@@ -212,7 +212,9 @@ direct.network <- function(x, rule=c("both", "upper", "lower")){
 #'
 #'   1. A single network, a character vector, and several optional
 #'      arguments. Then, the layers are values of the named edge
-#'      attributes. The optional arguments `.symmetric` and
+#'      attributes. If the vector has named elements (e.g.,
+#'      `c(a="advice", c="collaboration")`), the layers will be
+#'      renamed accordingly. The optional arguments `.symmetric` and
 #'      `.bipartite` are then interpreted as described below.
 #'
 #' @param .symmetric If the layer specification is via a single
@@ -279,6 +281,13 @@ direct.network <- function(x, rule=c("both", "upper", "lower")){
 #' \link[base:Syntax]{operator precedence} applies, so use of parentheses is
 #' recommended to ensure the logical expression is what it looks like.
 #'
+#' \strong{Important:} For performance reasons, \pkg{ergm.multi}'s
+#' Layer Logic implementation uses integer arithmetic. This means, in
+#' particular, that `/` will round down instead of returning a
+#' fraction (as `%/%` does in \R), and [round()] function without a
+#' second argument (which can be negative to round to the nearest 10,
+#' 100, etc.) is not meaningful and will be ignored.
+#'
 #' For example, if LHS is \code{Layer(A=nwA, B=nwB)}, both \code{~`2`} and
 #' \code{~B} refer to \code{nwB}, while \code{A&!B} refers to a
 #' \dQuote{logical} layer that has ties that are in \code{nwA} but not in
@@ -321,11 +330,12 @@ direct.network <- function(x, rule=c("both", "upper", "lower")){
 #' flo <- Layer(m = flomarriage, b = flobusiness)
 #' ergm(flo ~ L(~edges, ~m)+L(~edges, ~b))
 #'
-#' # Method 3: edge attributes:
+#' # Method 3: edge attributes (also illustrating renaming):
 #' flo <- flomarriage | flobusiness
-#' flo[,, names.eval="m"] <- as.matrix(flomarriage)
-#' flo[,, names.eval="b"] <- as.matrix(flobusiness)
-#' flo <- Layer(flo, c("m","b"))
+#' flo[,, names.eval="marriage"] <- as.matrix(flomarriage)
+#' flo[,, names.eval="business"] <- as.matrix(flobusiness)
+#' flo # edge attributes
+#' flo <- Layer(flo, c(m="marriage", b="business"))
 #' ergm(flo ~ L(~edges, ~m)+L(~edges, ~b))
 #'
 #' ### Specifying modes and mixed bipartitedness
@@ -420,7 +430,8 @@ Layer <- function(..., .symmetric=NULL, .bipartite=NULL, .active=NULL){
       }
     }
 
-    names(nwl) <- args[[2]]
+    # Set names: if args[[2]] is a named vector, use those where set.
+    names(nwl) <- NVL3(names(args[[2]]), ifelse(.=="", args[[2]], .), args[[2]])
 
   }else stop("Unrecognized format for multilayer specification. See help for information.")
 
@@ -533,12 +544,12 @@ InitErgmTerm..layer.net <- function(nw, arglist, ...){
   
   if(test_eval.LayerLogic(ll, FALSE)) stop("Layer specifications that produce edges on the output layer for empty input layers are not supported at this time.", call.=FALSE)
   
-  list(name="_layer_net", coef.names=c(), iinputs=c(unlist(.block_vertexmap(nw, ".LayerID", TRUE)), if(is.directed(nw)) sapply(nwl, function(nw) (nw%v% ".undirected")[1])), inputs=c(ll), dependence=dependence)
+  list(name="_layer_net", coef.names=c(), iinputs=c(unlist(.block_vertexmap(nw, ".LayerID", TRUE)), if(is.directed(nw)) sapply(nwl, function(nw) (nw%v% ".undirected")[1]), ll), dependence=dependence)
 }
 
 LL_PREOPMAP <- list(
     # Unary operators
-    c(`t` = -23)
+    c(`t` = -21)
   )
 LL_POSTOPMAP <- list(
     # Unary operators
@@ -547,8 +558,8 @@ LL_POSTOPMAP <- list(
       `+` = NA,
       `-` = -16,
       `abs` = -17,
-      `round` = -20,
-      `sign` = -22),
+      `round` = NA,
+      `sign` = -20),
     # Binary operators
     c(`&` = -2,
       `&&` = -2,
@@ -567,8 +578,8 @@ LL_POSTOPMAP <- list(
       `/` = -14,
       `%%` = -15,
       `^` = -18,
-      `%/%` = -19,
-      `round` = -21)
+      `%/%` = -14,
+      `round` = -19)
 )
 
 LL_IDEMPOTENT <- c("&", "&&", "|", "||")
@@ -578,7 +589,7 @@ LL_CONTRADICTORY <- c("!=", "xor", "<", ">")
 #' Internal representation of Layer Logic
 #'
 #' @param formula A Layer Logic formula.
-#' @param namemap A character vector giving the names, of the layers
+#' @param namemap A character vector giving the names of the layers
 #'   referenced, or `NULL`.
 #'
 #' @return A structure with nonce class
@@ -682,9 +693,9 @@ to_ergm_Cdouble.ergm_LayerLogic <- function(x, ...){
 }
 
 test_eval.LayerLogic <- function(commands, lv, lvr = lv){
-  coms <- commands[-1]
+  coms <- as.integer(commands[-1])
   lv <- rep(lv, length.out=max(coms))
-  stack <- c()
+  stack <- integer(0)
   if(sum(coms!=0 & !coms%in%unlist(LL_PREOPMAP))!=commands[1]) stop("Layer specification command vector specifies incorrect number of commands.", call.=FALSE)
   for(i in 1:commands[1]){
     com <- coms[1]
@@ -746,7 +757,7 @@ test_eval.LayerLogic <- function(commands, lv, lvr = lv){
     }else if(com==-14){
       x0 <- stack[1]; stack <- stack[-1]
       y0 <- stack[1]; stack <- stack[-1]
-      stack <- c(x0 / y0, stack)
+      stack <- c(x0 %/% y0, stack)
     }else if(com==-15){
       x0 <- stack[1]; stack <- stack[-1]
       y0 <- stack[1]; stack <- stack[-1]
@@ -760,22 +771,15 @@ test_eval.LayerLogic <- function(commands, lv, lvr = lv){
     }else if(com==-18){
       x0 <- stack[1]; stack <- stack[-1]
       y0 <- stack[1]; stack <- stack[-1]
-      stack <- c(x0 ^ y0, stack)
+      stack <- c(as.integer(x0 ^ y0), stack)
     }else if(com==-19){
       x0 <- stack[1]; stack <- stack[-1]
       y0 <- stack[1]; stack <- stack[-1]
-      stack <- c(x0 %/% y0, stack)
+      stack <- c(as.integer(round(x0, y0)), stack)
     }else if(com==-20){
       x0 <- stack[1]; stack <- stack[-1]
-      stack <- c(round(x0), stack)
-    }else if(com==-21){
-      x0 <- stack[1]; stack <- stack[-1]
-      y0 <- stack[1]; stack <- stack[-1]
-      stack <- c(round(x0, y0), stack)
-    }else if(com==-22){
-      x0 <- stack[1]; stack <- stack[-1]
       stack <- c(sign(x0), stack)
-    }else if(com==-23){ 
+    }else if(com==-21){ 
       coms <- coms[-1]
       x0 <- coms[1]
       stack <- c(lvr[x0], stack)
@@ -854,15 +858,13 @@ InitErgmTerm.L <- function(nw, arglist, ...){
   nw1 <- nwl[[1]]
   m <- ergm_model(a$formula, nw1, ..., offset.decorate=FALSE)
 
-  inputs <- c(nltrms, w)
-
   ## FIXME: Is this consistent with extended state API, or do we need to have a different "model" for each layer?
   wm <- wrap.ergm_model(m, nw1, function(x) .lspec_coef.namewrap(list(a$Ls))(x))
   gs <- wm$emptynwstats
   wm$emptynwstats <- if(!is.null(gs)) gs*nltrms
   wm$dependence <- wm$dependence || !is.dyad.independent(auxiliaries, basis=nw)
 
-  c(list(name="OnLayer", inputs=inputs, submodel=m, auxiliaries = auxiliaries),
+  c(list(name="OnLayer", iinputs=nltrms, inputs=w, submodel=m, auxiliaries = auxiliaries),
     wm)
 }
 
@@ -902,9 +904,7 @@ InitErgmTerm.CMBL <- function(nw, arglist, ...){
   auxiliaries <- .mk_.layer.net_auxform(Ls)
   nltrms <- length(list_rhs.formula(auxiliaries))
 
-  inputs <- c(nltrms)
-
-  list(name="layerCMB", coef.names = paste0('CMBL(',despace(deparse(Ls)),')'), inputs=inputs, dependence=TRUE, auxiliaries = auxiliaries)
+  list(name="layerCMB", coef.names = paste0('CMBL(',despace(deparse(Ls)),')'), iinputs=nltrms, dependence=TRUE, auxiliaries = auxiliaries)
 }
 
 ################################################################################
