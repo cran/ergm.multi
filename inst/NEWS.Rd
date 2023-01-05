@@ -64,6 +64,24 @@
 
 %% }
 
+\section{Changes in version 0.1.2}{
+  \subsection{BUG FIXES}{
+    \itemize{
+      \item \code{\link{marg_cond_sim}()} now expects \code{\link{control.gofN}()} as its \code{control=} list.
+
+      \item Some unit test tolerances have been loosed, making false positives less likely.
+
+      \item Miscellaneous documentation fixes.
+    }
+  }
+
+  \subsection{OTHER USER-VISIBLE CHANGES}{
+    \itemize{
+      \item Tweaks to the \code{\link{combine_networks}()} API to make it more robust, space-efficient, and flexible; in particular to make it possible for \CRANpkg{tergm} to depend on it rather than maintaining its own copy.
+    }
+  }
+}
+
 
 \section{Changes in version 0.1.1}{
 

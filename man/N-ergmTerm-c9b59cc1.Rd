@@ -7,11 +7,17 @@
 \alias{InitWtErgmTerm.N}
 \title{Evaluation on multiple networks}
 \usage{
-# binary: N(formula, lm=~1, subset=TRUE, weights=1, contrasts=NULL, offset=0, label=NULL)
+# binary: N(formula, lm=~1, subset=TRUE, weights=1, contrasts=NULL, offset=0, label=NULL,
+#           .NetworkID=".NetworkID", .NetworkName=".NetworkName")
 
-# valued: N(formula, lm=~1, subset=TRUE, weights=1, contrasts=NULL, offset=0, label=NULL)
+# valued: N(formula, lm=~1, subset=TRUE, weights=1, contrasts=NULL, offset=0, label=NULL,
+#           .NetworkID=".NetworkID", .NetworkName=".NetworkName")
 }
 \arguments{
+\item{.NetworkID, .NetworkName}{Optional strings indicating the
+vertex attributes used to distinguish and name the networks;
+intended to be used by term developers.}
+
 \item{formula}{a one-sided \code{\link[=ergm]{ergm()}}-style formula with the terms to be evaluated}
 
 \item{lm}{a one-sided \code{\link[=lm]{lm()}}-style formula whose RHS specifies the network-level predictors for the terms in the \code{\link[=ergm]{ergm()}} formula \code{formula}.}
@@ -26,7 +32,8 @@ networks.}
 
 \item{label}{An optional parameter which will add a label to model
 parameters to help identify the term (which may have similar
-predictors but, say, a different network subset) in the output.}
+predictors but, say, a different network subset) in the output
+\emph{or} a function that wraps the names.}
 }
 \description{
 Evaluates the terms in \code{formula} on each of the networks joined
@@ -58,7 +65,7 @@ formula.
 \section{Offsets and fixing parameters}{
 
 
-By an \code{N(formula, lm)} term will add \eqn{p \times q}{p*q} free
+By default, an \code{N(formula, lm)} term will add \eqn{p \times q}{p*q} free
 parameters, where \eqn{p} is the number of free parameters
 (possibly curved) of the ERGM specified by \code{formula}, and \eqn{q}
 is the number of parameters specified by the \code{lm} formula. That is,
@@ -97,6 +104,8 @@ allowing a constant decay parameter to be estimated.
 }
 \seealso{
 \code{\link{ergmTerm}} for index of model terms currently visible to the package.
+
+\Sexpr[results=rd,stage=render]{ergm:::.formatTermKeywords("ergmTerm", "N", "subsection")}
 
 \code{vignette("Goeyvaerts_reproduction")} for a demonstration.
 }
