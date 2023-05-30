@@ -5,7 +5,7 @@
 #  open source, and has the attribution requirements (GPL Section 7) at
 #  https://statnet.org/attribution .
 #
-#  Copyright 2003-2022 Statnet Commons
+#  Copyright 2003-2023 Statnet Commons
 ################################################################################
 ## TODO: LL-Constrained proposals.
 ## TODO: Check that noncommutative LL operators work as intended.
@@ -438,18 +438,18 @@ Layer <- function(..., .symmetric=NULL, .bipartite=NULL, .active=NULL){
   if(!is.null(.active)){
     if(!is.list(.active)) .active <- list(.active)
     .active <- rep(.active, length.out=length(nwl))
-    al <- mapply(function(nw, a) ergm_get_vattr(a, nw, accept="logical"),
-                 nwl, .active, SIMPLIFY=FALSE)
+    al <- Map(function(nw, a) ergm_get_vattr(a, nw, accept="logical"),
+              nwl, .active)
     if(!all(unlist(al)))
-      nwl <- mapply(function(nw, a) blacklist_intersect(nw, a, invert=TRUE),
-                    nwl, al, SIMPLIFY=FALSE)
+      nwl <- Map(function(nw, a) blacklist_intersect(nw, a, invert=TRUE),
+                 nwl, al)
   }
 
   # nwl may now be a list with networks of heterogeneous bipartitedness.
   bip <- sapply(nwl, `%n%`, "bipartite") %>% sapply(NVL, 0L)
   blockout <- if(all_identical(bip)) rep(FALSE, length(nwl)) else bip
 
-  nwl <- mapply(function(nw, b){
+  nwl <- Map(function(nw, b){
     nw %v% ".bipartite" <- b;
     if(b){
       n <- network.size(nw)
@@ -461,17 +461,17 @@ Layer <- function(..., .symmetric=NULL, .bipartite=NULL, .active=NULL){
       nw %n% "bipartite" <- FALSE
     }
     nw
-  }, nwl, blockout, SIMPLIFY=FALSE)
+  }, nwl, blockout)
 
   # nwl may now be a list with networks of heterogeneous directedness.
   
   dir <- sapply(nwl, is.directed)
   symm <- if(all_identical(dir)) rep(FALSE, length(nwl)) else !dir
 
-  nwl <- mapply(function(nw, symm) {
+  nwl <- Map(function(nw, symm) {
     nw %v% ".undirected" <- symm
     if(symm) direct.network(nw,rule="upper") else nw
-  }, nwl, symm, SIMPLIFY=FALSE)
+  }, nwl, symm)
 
   # nwl is now a list of networks with homogeneous directedness, some
   # networks tagged with vertex attribute .undirected.

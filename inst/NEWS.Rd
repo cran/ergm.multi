@@ -5,7 +5,7 @@
 %  open source, and has the attribution requirements (GPL Section 7) at
 %  https://statnet.org/attribution .
 %
-%  Copyright 2003-2022 Statnet Commons
+%  Copyright 2003-2023 Statnet Commons
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \name{NEWS}
 \title{NEWS file for the \code{\link[=ergm-package]{ergm}} package}
@@ -63,6 +63,27 @@
   % }
 
 %% }
+
+
+\section{Changes in version 0.2.0}{
+
+  \subsection{NEW FEATURES}{
+    \itemize{
+      \item \code{\link{gofN}} objects now how \code{\link{augment}} and \code{\link{autoplot}} methods for Tidyverse and \CRANpkg{ggplot2} diagnostics.
+
+      \item \code{\link{plot.gofN}()} and \code{\link{autoplot.gofN}()} are now more flexible in how they label extreme points via the \code{id.label=} argument.
+    }
+  }
+
+  \subsection{BUG FIXES}{
+    \itemize{
+      \item Fixed how parallel processing settings are handled in \code{\link{gofN}()} and \code{\link{marg_cond_sim}()}.
+    }
+  }
+
+}
+
+
 
 \section{Changes in version 0.1.2}{
   \subsection{BUG FIXES}{

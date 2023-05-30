@@ -5,7 +5,7 @@
 #  open source, and has the attribution requirements (GPL Section 7) at
 #  https://statnet.org/attribution .
 #
-#  Copyright 2003-2022 Statnet Commons
+#  Copyright 2003-2023 Statnet Commons
 ################################################################################
 .mean_var <- function(x, ng){
   .Call("mean_var_wrapper", x, length(x)/ng, PACKAGE="ergm.multi")
@@ -28,13 +28,13 @@
 #' \insertCite{KrCo22t;textual}{ergm.multi}.
 #'
 #' @param object an [`ergm`] object.
+#' @param x a `gofN` object.
 #' @param GOF a one-sided [`ergm`] formula specifying network
 #'   statistics whose goodness of fit to test, or [`NULL`]; if `NULL`,
 #'   uses the original model.
 #' @param subset argument for the [`N`][N-ergmTerm] term.
 #' @param \dots additional arguments to functions ([simulate.ergm()]
-#'   and [summary.ergm_model()] for the constructor, [plot()],
-#'   [qqnorm()], and [qqline()] for the plotting method).
+#'   and [summary.ergm_model()]) for the constructor.
 #' @param control See [control.gofN.ergm()].
 #' @param save_stats If `TRUE`, save the simulated network statistics;
 #'   defaults to `FALSE` to save memory and disk space.
@@ -66,7 +66,9 @@
 #' 
 #' \item{control}{Control parameters passed.}
 #'
-#' @seealso [ergm::gof()] for single-network goodness-of-fit simulations in \CRANpkg{ergm}
+#' @seealso [plot.gofN()] and [autoplot.gofN()] for plotting `gofN`
+#'   objects to make residual plots; [ergm::gof()] for single-network
+#'   goodness-of-fit simulations in \CRANpkg{ergm}
 #'
 #' @references \insertAllCited{}
 #'
@@ -95,6 +97,11 @@
 #' plot(fit.gof, against=~log(.fitted)) # Plot against transformed fitted values.
 #' }
 #'
+#' ### If 'ggplot2' and 'ggrepel' are installed, illustrate the autoplot() method.
+#' if(require("ggplot2") && requireNamespace("ggrepel")){
+#'   autoplot(fit.gof)
+#' }
+#'
 #' # Default is good enough in this case, but sometimes, we might want to set it higher. E.g.,
 #' \dontrun{
 #' fit.gof <- gofN(fit, GOF=~edges, control=control.gofN.ergm(nsim=400))
@@ -118,7 +125,7 @@ gofN <- function(object, GOF=NULL, subset=TRUE, control=control.gofN.ergm(), sav
   nthreads <- nthreads(control) # Fix this, so as not to become confused inside a clusterCall().
 
   message("Constructing simulation model(s).")
-  if(!is.null(object$constrained.obs)){
+  if(is.na(object)){
 
     # First, make sure that the sample size is a multiple of the number of threads.
     if(control$obs.twostage && control$obs.twostage%%nthreads!=0){
@@ -128,10 +135,10 @@ gofN <- function(object, GOF=NULL, subset=TRUE, control=control.gofN.ergm(), sav
       control$obs.twostage <- obs.twostage.new
     }
 
-    sim.m.obs_settings <- simulate(object, monitor=NULL, observational=TRUE, nsim=control$nsim, control=control$obs.simulate, basis=nw, output="stats", ..., return.args="ergm_model")
+    sim.m.obs_settings <- simulate(object, monitor=NULL, observational=TRUE, nsim=control$nsim, control=copy_parallel_controls(control,control$obs.simulate), basis=nw, output="stats", ..., return.args="ergm_model")
   }else control$obs.twostage <- FALSE # Ignore two-stage setting if no observational process.
 
-  sim.m_settings <- simulate(object, monitor=NULL, nsim=control$nsim, control=control$simulate, basis=nw, output="stats", ..., return.args="ergm_model")
+  sim.m_settings <- simulate(object, monitor=NULL, nsim=control$nsim, control=copy_parallel_controls(control,control$simulate), basis=nw, output="stats", ..., return.args="ergm_model")
 
   message("Constructing GOF model.")
   NVL(GOF) <- if(length(object$formula)==3) object$formula[-2] else object$formula
@@ -158,7 +165,7 @@ gofN <- function(object, GOF=NULL, subset=TRUE, control=control.gofN.ergm(), sav
 
   # TODO: Make this adaptive: start with a small simulation,
   # increase on fail; or perhaps use a pilot sample.
-  if(!is.null(object$constrained.obs)){
+  if(is.na(object)){
 
     # Construct a simulate.ergm_state() call list for constrained simulation.
     args <- .update.list(sim.m.obs_settings,
@@ -176,6 +183,7 @@ gofN <- function(object, GOF=NULL, subset=TRUE, control=control.gofN.ergm(), sav
 
       #' @importFrom parallel clusterCall
       if(!is.null(cl)){
+        ## NB: gen_obs_imputation_series() suppresses parallel processing inside it.
         sim <- clusterCall(cl, gen_obs_imputation_series, sim.s_settings, sim.s.obs_settings, control, nthreads, monitored, save_stats)
         SST <- lapply(sim, attr, "SST")
         MV <- lapply(sim, attr, "MV")
@@ -194,6 +202,7 @@ gofN <- function(object, GOF=NULL, subset=TRUE, control=control.gofN.ergm(), sav
     }
     suppressWarnings(rm(sim.s_settings))
     message("Simulating constrained sample.")
+    ## NB: sim_stats_piecemeal() doesn't suppress parallel processing inside it.
     sim.obs <- sim_stats_piecemeal(.update.list(sim.s.obs_settings,
                                                 list(nsim=control$nsim, return.args=NULL)), monitored, max_elts, save_stats)
     rm(sim.s.obs_settings)
@@ -253,7 +262,13 @@ gofN <- function(object, GOF=NULL, subset=TRUE, control=control.gofN.ergm(), sav
   structure(o, nw=nw, subset=subset, control=control, class="gofN")
 }
 
-# Helper functions for gofN.
+## Helper functions for gofN.
+
+copy_parallel_controls <- function(from, to){
+  ctrls <- c("parallel", "parallel.type", "parallel.version.check", "parallel.inherit.MT")
+  replace(to, ctrls, from[ctrls])
+}
+
 sim_stats_piecemeal <- function(sim.s_settings, monitored, max_elts, save_stats=FALSE){
   nthreads <- nthreads(sim.s_settings$control)
   # This needs to be a multiple of nthreads:
@@ -294,6 +309,7 @@ sim_stats_piecemeal <- function(sim.s_settings, monitored, max_elts, save_stats=
 
   structure(sim, SST=SST, state=state)
 }
+
 gen_obs_imputation_series <- function(sim.s_settings, sim.s.obs_settings, control, nthreads, monitored, save_stats=FALSE){
   n_cond <- control$obs.twostage/nthreads
   sim <- if(save_stats) vector("list", n_cond) else list()
@@ -352,27 +368,33 @@ gen_obs_imputation_series <- function(sim.s_settings, sim.s.obs_settings, contro
   }
 }
 
-#' @describeIn gofN A plotting method, making residual and scale-location plots.
+#' Plotting methods for [`gofN`], making residual and scale-location plots.
+#'
+#' The [plot()] method uses \R graphics.
 #'
 #' @param x a [`gofN`] object.
-#' @param against vector of values, network attribute, or a formula whose RHS gives an expression in terms of network attributes to plot against; if `NULL` (default), plots against fitted values. The formula may also contain a `.fitted` variable which will be substituted with the fitted values. Factor values are visualised using boxplots.
+#' @param against what the residuals should be plotted against. Note that different methods use different formats: see Details. Categorical ([`factor`] and [`ordered`]) values are visualised using boxplots, with [`ordered`] values also adding a smoothing line like the quantitative. Defaults to the fitted values.
 #' @param col,pch,cex,bg vector of values (wrapped in [I()]), network attribute, or a formula whose RHS gives an expression in terms of network attributes to plot against.
 #' @param which which to plot (`1` for residuals plot, `2` for \eqn{\sqrt{|R_i|}}{sqrt(|R_i|)} scale plot, and `3` for normal quantile-quantile plot).
+#' @param ... additional arguments to [plot()], [qqnorm()], and [qqline()], and others.
 #' @param ask whether the user should be prompted between the plots.
-#' @param id.n Number of extreme points to label explicitly.
-#' @param main A template for the plots' titles; these use [glue()]'s templating, with `{type}` replaced with the type of plot and `{name}` replaced with the statistic.
-#' @param xlab Horizontal axis label; defaults to a character representation of `against`.
-#' @param ylim Vertical range for the plots, interpreted as in [graphics::plot()]; can be specified as a list with 3 elements, giving the range for the corresponding plot according to the plot numbers for the `which=` argument, and can be used to ensure that, e.g., diagnostic plots for different models are on the same scale.
-#' @param cex.id Scaling factor for characters used to label extreme points; see [plot.lm()].
+#' @param id.n maximum number of extreme points to label explicitly.
+#' @param id.label specification for how extreme points are to be labeled, defaulting to network's index in the combined network.
+#' @param main a template for the plots' titles; these use [glue()]'s templating, with `{type}` replaced with the type of plot and `{name}` replaced with the statistic.
+#' @param xlab horizontal axis label; defaults to a character representation of `against`.
+#' @param ylim vertical range for the plots, interpreted as in [graphics::plot()]; can be specified as a list with 3 elements, giving the range for the corresponding plot according to the plot numbers for the `which=` argument, and can be used to ensure that, e.g., diagnostic plots for different models are on the same scale.
+#' @param cex.id scaling factor for characters used to label extreme points; see [plot.lm()].
+#'
+#' @details For the `plot()` method, `against` and `id.label` can be vectors of values (enclosed in [I()] to be used as is), a character string identifying a network attribute, or a formula whose RHS gives an expression in terms of network attributes to plot against. The `against` formula may also contain a `.fitted` variable which will be substituted with the fitted values.
 #' 
 #' @importFrom grDevices dev.interactive devAskNewPage adjustcolor
 #' @importFrom graphics abline panel.smooth plot text axis boxplot lines points
 #' @importFrom methods is
 #' @importFrom glue glue
 #'
-#' @seealso [plot.lm()], [graphics::plot()] for regression diagnostic plots and their parameters
+#' @seealso [gofN()] for examples, [plot.lm()], [graphics::plot()] for regression diagnostic plots and their parameters.
 #' @export
-plot.gofN <- function(x, against=NULL, which=1:2, col=1, pch=1, cex=1, bg=0, ..., ask = length(which)>1 && dev.interactive(TRUE), id.n=3, main="{type} for {sQuote(name)}", xlab=NULL, ylim=NULL, cex.id=0.75){
+plot.gofN <- function(x, against=NULL, which=1:2, col=1, pch=1, cex=1, bg=0, ..., ask = length(which)>1 && dev.interactive(TRUE), id.n=3, id.label=NULL, main="{type} for {sQuote(name)}", xlab=NULL, ylim=NULL, cex.id=0.75){
   if(ask){
     prev.ask <- devAskNewPage(TRUE)
     on.exit(devAskNewPage(prev.ask))
@@ -381,7 +403,7 @@ plot.gofN <- function(x, against=NULL, which=1:2, col=1, pch=1, cex=1, bg=0, ...
   if(!is.list(ylim)) ylim <- list(ylim)
   ylim <- rep_len(ylim, 3)
 
-  if(any(sapply(list(against, col, pch, cex),
+  if(any(sapply(list(against, col, pch, cex, id.label),
                 function(x) is.character(x) || is(x,"formula"))))
     nattrs <- as_tibble(attr(x,"nw"), unit="networks")[attr(x,"subset"),]
   
@@ -393,7 +415,7 @@ plot.gofN <- function(x, against=NULL, which=1:2, col=1, pch=1, cex=1, bg=0, ...
                      despace(deparse(substitute(against),width.cutoff=500L))))
 
   np <- sum(attr(x,"subset"))
-  for(gpar in c("col", "bg", "pch", "cex")){
+  for(gpar in c("col", "bg", "pch", "cex", "id.label")){
     a <- get(gpar)
     a <- switch(class(a),
                 AsIs = a,
@@ -461,6 +483,7 @@ plot.gofN <- function(x, against=NULL, which=1:2, col=1, pch=1, cex=1, bg=0, ...
     nn <- sum(!is.na(summ$pearson))
     ez <- qnorm((nn+.5)/(nn+1)) # Extreme standard normal quantile appropriate to the sample size.
     ei <- !is.na(summ$pearson) & rank(-abs(summ$pearson), ties.method="min")<=id.n & abs(summ$pearson)>ez
+    NVL(id.label) <- seq_along(summ$pearson)
 
     NVL(againstval) <- summ$fitted
     resid.plotter <- if(is.factor(againstval)) boxplot.smooth else points.smooth
@@ -468,11 +491,11 @@ plot.gofN <- function(x, against=NULL, which=1:2, col=1, pch=1, cex=1, bg=0, ...
     w <- 1/(summ$var - summ$var.obs)
 
     if(1L %in% which){
-      resid.plotter(againstval, summ$pearson, w=w, col=col, bg=bg, pch=pch, cex=cex, cex.id=cex.id, id=ifelse(ei, seq_along(summ$pearson), NA), main = glue(main, type="Residuals vs. Fitted"), xlab=xlab, ylab="Std. Pearson resid.", ylim=ylim[[1L]], ...)
+      resid.plotter(againstval, summ$pearson, w=w, col=col, bg=bg, pch=pch, cex=cex, cex.id=cex.id, id=ifelse(ei, id.label, NA), main = glue(main, type="Residuals vs. Fitted"), xlab=xlab, ylab="Std. Pearson resid.", ylim=ylim[[1L]], ...)
     }
     
     if(2L %in% which){
-      resid.plotter(againstval, sqrt(abs(summ$pearson)), w=w, col=col, bg=bg, pch=pch, cex=cex, cex.id=cex.id, id=ifelse(ei, seq_along(summ$pearson), NA), main = glue(main, type="Scale-location"), xlab=xlab, ylab=expression(sqrt(abs("Std. Pearson resid."))), ylim=ylim[[2L]], ...)
+      resid.plotter(againstval, sqrt(abs(summ$pearson)), w=w, col=col, bg=bg, pch=pch, cex=cex, cex.id=cex.id, id=ifelse(ei, id.label, NA), main = glue(main, type="Scale-location"), xlab=xlab, ylab=expression(sqrt(abs("Std. Pearson resid."))), ylim=ylim[[2L]], ...)
     }
 
     if(3L %in% which){
@@ -482,6 +505,141 @@ plot.gofN <- function(x, against=NULL, which=1:2, col=1, pch=1, cex=1, bg=0, ...
     
   }
 }
+
+
+#' @rdname plot.gofN
+#'
+#' @description The [ggplot2::autoplot()] method uses \CRANpkg{ggplot2} and \CRANpkg{ggrepel}.
+#'
+#' @param mappings a named list of lists of mappings constructed by [ggplot2::aes()] overriding the defaults. See Details below.
+#' @param geom_args a named list of lists of arguments overriding the defaults for the individual geoms. See Details below.
+#'
+#' @details For `autoplot.gofN()`, `against` and `id.label` are interpreted as
+#'   expressions in terms of network attributes and values generated by
+#'   [augment.gofN()], included `.fitted` for the fitted values.
+#'
+#' @section Customising `autoplot.gofN()`:
+#'
+#' `autoplot.gofN()` constructs the plots out of [ggplot2::ggplot()],
+#' [ggplot2::geom_point()] (for numeric `against`), [ggplot2::geom_boxplot()] for
+#' categorical or ordinal `against`), and [ggplot2::geom_smooth()] (for numeric
+#' or ordinal `against`), and [ggrepel::geom_text_repel()]. Mappings and
+#' arguments passed through `mappings` and `geom_args` override the
+#' respective defaults. They may have elements `default` (for
+#' `ggplot()`), `point` (for `geom_point()` and `geom_boxplot()`),
+#' `smooth` (for `geom_smooth`), and `text` (for `geom_text_repel()`).
+#'
+#' @return `autoplot.gofN()` returns a list of `ggplot` objects that
+#'   if printed render to diagnostic plots. If there is only one, the
+#'   object itself is returned.
+#'
+#' @method autoplot gofN
+#' @rawNamespace S3method(ggplot2::autoplot, gofN)
+autoplot.gofN <- function(x, against=.fitted, which=1:2,
+                          mappings=list(),
+                          geom_args=list(),
+                          id.n=3, id.label=NULL){
+  if(!requireNamespace("ggplot2") || !requireNamespace("ggrepel")) stop(sQuote("autoplot()"), " method for ", sQuote("gofN"), " objects requires packages ", paste.and(sQuote(c("ggplot2", "ggrepel"))), ".")
+
+  against <- substitute(against)
+  id.label <- substitute(id.label)
+
+  nattrs <- generics::augment(x)
+  xlab <- deparse1(do.call(substitute, list(against, list(.fitted=as.name("Fitted values")))))
+
+  plots <- list()
+
+  for(name in names(x)){
+    a <- nattrs[nattrs$.stat_name==name,]
+
+    nn <- sum(!is.na(a$.pearson))
+    ez <- qnorm((nn+.5)/(nn+1)) # Extreme standard normal quantile appropriate to the sample size.
+    ei <- !is.na(a$.pearson) & rank(-abs(a$.pearson), ties.method="min")<=id.n & abs(a$.pearson)>ez
+
+    a$.against <- eval(against, envir = a, enclos = parent.frame())
+    a$.rownames <- NVL(eval(id.label, envir = a, enclos = parent.frame()), seq_along(ei))
+
+    mode_call <- function(f, custom_map, custom_args, def_map=ggplot2::aes(), def_args=list())
+      do.call(f, c(list(mapping=modifyList(def_map, as.list(custom_map))), modifyList(def_args, as.list(custom_args))))
+
+    resid_plot <- function(mapping, ylab){
+      o <- mode_call(ggplot2::ggplot, mappings$default, geom_args$default, mapping, list(data=a))
+      if(is.factor(a$.against)){
+        o <- o + mode_call(ggplot2::geom_boxplot, mappings$point, geom_args$point)
+        if(is.ordered(a$.against)) o <- o +  mode_call(ggplot2::geom_smooth, mappings$smooth, geom_args$smooth, ggplot2::aes(x=as.numeric(.against)), list(se=FALSE))
+      }
+      else o <- o + mode_call(ggplot2::geom_point, mappings$point, geom_args$point) +
+             mode_call(ggplot2::geom_smooth, mappings$smooth, geom_args$smooth, def_args=list(se=FALSE))
+      o <- o + ggplot2::xlab(xlab) + ggplot2::ylab(ylab) +
+        mode_call(ggrepel::geom_text_repel, mappings$text, geom_args$text, ggplot2::aes(label=ifelse(ei, .rownames, "")))
+      o
+    }
+
+    if(1L %in% which){
+      o <- resid_plot(ggplot2::aes(x=.against, y=.pearson, weight=.weight),
+                      "Std. Pearson resid.")
+      plots <- c(plots, list(o))
+    }
+
+    if(2L %in% which){
+      o <- resid_plot(ggplot2::aes(x=.against, y=sqrt(abs(.pearson)), weight=.weight),
+                      expression(sqrt(abs("Std. Pearson resid."))))
+      plots <- c(plots, list(o))
+    }
+  }
+
+  if(length(plots)==1) plots[[1]] else plots
+}
+
+
+#' @describeIn gofN a method for constructing a [`tibble`] of network attributes augmented with goodness of fit information. Columns include:\describe{
+#' \item{network attributes}{the attributes of each of the networks}
+#'
+#' \item{`.stat_name`}{name of the simulated statistic}
+#'
+#' \item{`.stat_id`}{index of the simulated statistic in the `gofN` object}
+#'
+#' \item{`.network_id`}{index of the network in the networks for which `gofN` was run (excluding those not in the subset)}
+#'
+#' \item{`.fitted`}{predicted value for the statistic}
+#'
+#' \item{`.observed`}{either the observed (for completely observed networks) or the predicted conditional on observed (for partially observed networks) value of the statistic}
+#'
+#' \item{`.pearson`}{the standardised Pearson residual}
+#'
+#' \item{`.var`, `.var.obs`}{estimated unconditional and average conditional variance of the statistic}
+#'
+#' \item{`.weight`}{inverse of the variance of the residual}
+#' }
+#'
+#' @examples
+#'
+#' ### If 'generics' is installed, illustrate the augment() method.
+#' if(require("generics")){
+#'   augment(fit.gof)
+#' }
+#'
+#' @method augment gofN
+#' @rawNamespace S3method(generics::augment, gofN)
+augment.gofN <- function(x, ...){
+  if(!requireNamespace("generics")) stop(sQuote("augment()"), " method for ", sQuote("gofN"), " objects requires package ", paste.and(sQuote(c("generics"))), ".")
+
+  nattrs <- as_tibble(attr(x,"nw"), unit="networks")[attr(x,"subset"),]
+
+  seq_along(x) %>%
+    map(~dplyr::bind_cols(.stat_name = names(x)[.],
+                          .stat_id = .,
+                          .network_id = seq_len(nrow(nattrs)),
+                          nattrs,
+                          .fitted = x[[.]]$fitted,
+                          .pearson = x[[.]]$pearson,
+                          .observed = x[[.]]$observed,
+                          .var = x[[.]]$var,
+                          .var.obs = x[[.]]$var.obs,
+                          .weight = 1/(x[[.]]$var - x[[.]]$var.obs))) %>%
+    dplyr::bind_rows()
+}
+
 
 #' @describeIn gofN A simple summary function.
 #' @param by a numeric or character vector, or a formula whose RHS gives an expression in terms of network attributes, used as a grouping variable for summarizing the values.

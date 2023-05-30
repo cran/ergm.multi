@@ -5,7 +5,7 @@
 #  open source, and has the attribution requirements (GPL Section 7) at
 #  https://statnet.org/attribution .
 #
-#  Copyright 2003-2022 Statnet Commons
+#  Copyright 2003-2023 Statnet Commons
 ################################################################################
 #' @import ergm
 #' @import network
@@ -24,7 +24,7 @@
 
 .onLoad <- function(libname, pkgname){
   # . is used as a placeholder by stantet.common::NVL3().
-  utils::globalVariables(".")
+  utils::globalVariables(c(".", ".fitted", ".against", ".rownames", ".pearson", ".weight"))
   options(ergm.eval.loglik=TRUE)
 
   eval(COLLATE_ALL_MY_CONTROLS_EXPR)

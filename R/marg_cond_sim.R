@@ -5,7 +5,7 @@
 #  open source, and has the attribution requirements (GPL Section 7) at
 #  https://statnet.org/attribution .
 #
-#  Copyright 2003-2022 Statnet Commons
+#  Copyright 2003-2023 Statnet Commons
 ################################################################################
 #' Calculate gofN()-style Pearson residuals for arbitrary statistics
 #'
@@ -35,7 +35,7 @@ marg_cond_sim <- function(object, nsim=1, obs.twostage=nsim/2, GOF=NULL, control
   nthreads <- nthreads(control) # Fix this, so as not to become confused inside a clusterCall().
 
   message("Constructing simulation model(s).")
-  if(!is.null(object$constrained.obs)){
+  if(is.na(object)){
 
     # First, make sure that the sample size is a multiple of the number of threads.
     if(control$obs.twostage && control$obs.twostage%%nthreads!=0){
@@ -45,10 +45,10 @@ marg_cond_sim <- function(object, nsim=1, obs.twostage=nsim/2, GOF=NULL, control
       control$obs.twostage <- obs.twostage.new
     }
 
-    sim.m.obs_settings <- simulate(object, monitor=NULL, observational=TRUE, nsim=control$nsim, control=control$obs.simulate, basis=nw, output="stats", ..., return.args="ergm_model")
+    sim.m.obs_settings <- simulate(object, monitor=NULL, observational=TRUE, nsim=control$nsim, control=copy_parallel_controls(control,control$obs.simulate), basis=nw, output="stats", ..., return.args="ergm_model")
   }else control$obs.twostage <- FALSE # Ignore two-stage setting if no observational process.
 
-  sim.m_settings <- simulate(object, monitor=NULL, nsim=control$nsim, control=control$simulate, basis=nw, output="stats", ..., return.args="ergm_model")
+  sim.m_settings <- simulate(object, monitor=NULL, nsim=control$nsim, control=copy_parallel_controls(control,control$simulate), basis=nw, output="stats", ..., return.args="ergm_model")
 
   message("Constructing GOF model.")
   NVL(GOF) <- if(length(object$formula)==3) object$formula[-2] else object$formula
@@ -70,7 +70,7 @@ marg_cond_sim <- function(object, nsim=1, obs.twostage=nsim/2, GOF=NULL, control
 
   # TODO: Make this adaptive: start with a small simulation,
   # increase on fail; or perhaps use a pilot sample.
-  if(!is.null(object$constrained.obs)){
+  if(is.na(object)){
 
     # Construct a simulate.ergm_state() call list for constrained simulation.
     args <- .update.list(sim.m.obs_settings,

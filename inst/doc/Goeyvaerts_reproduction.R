@@ -11,6 +11,7 @@ library(ergm.multi)
 library(dplyr)
 library(purrr)
 library(tibble)
+library(ggplot2)
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------
 data(Goeyvaerts)
@@ -98,9 +99,9 @@ gof.wd <- gofN(fit.wd, GOF = ~ edges + kstar(2) + triangles)
 summary(gof.wd)
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------
-plot(gof.wd)
+autoplot(gof.wd)
 
 ## -------------------------------------------------------------------------------------------------------------------------------------------------------------
-plot(gof.wd, against=~sqrt(.fitted))
-plot(gof.wd, against=~factor(n))
+autoplot(gof.wd, against=sqrt(.fitted))
+autoplot(gof.wd, against=ordered(n))
 
