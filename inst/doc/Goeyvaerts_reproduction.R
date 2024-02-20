@@ -1,4 +1,4 @@
-## ---- echo=FALSE, cache=FALSE, eval=TRUE----------------------------------------------------------------------------------------------------------------------
+## ----echo=FALSE, cache=FALSE, eval=TRUE-----------------------------------------------------------------------------------------------------------------------
 library(knitr)
 library(rmarkdown)
 options(rmarkdown.html_vignette.check_title = FALSE)
@@ -6,7 +6,7 @@ opts_chunk$set(message=FALSE, echo=TRUE, cache=TRUE, autodep=TRUE,
 concordance=TRUE, error=FALSE, fig.width=7, fig.height=7)
 options(width=160)
 
-## ---- message=FALSE-------------------------------------------------------------------------------------------------------------------------------------------
+## ----message=FALSE--------------------------------------------------------------------------------------------------------------------------------------------
 library(ergm.multi)
 library(dplyr)
 library(purrr)
