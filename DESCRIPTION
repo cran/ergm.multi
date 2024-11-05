@@ -1,5 +1,5 @@
 Package: ergm.multi
-Version: 0.2.1
+Version: 0.2.1.1
 Date: 2024-02-20
 Title: Fit, Simulate and Diagnose Exponential-Family Models for
         Multiple or Multilayer Networks
@@ -28,7 +28,7 @@ Config/testthat/parallel: true
 Config/testthat/edition: 3
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2024-02-20 12:50:23 UTC; pavel
+Packaged: 2024-11-05 05:00:43 UTC; hornik
 Author: Pavel N. Krivitsky [aut, cre] (<https://orcid.org/0000-0002-9101-3362>),
   Mark S. Handcock [ctb],
   David R. Hunter [ctb],
@@ -37,4 +37,4 @@ Author: Pavel N. Krivitsky [aut, cre] (<https://orcid.org/0000-0002-9101-3362>),
   Joyce Cheng [ctb]
 Maintainer: Pavel N. Krivitsky <pavel@statnet.org>
 Repository: CRAN
-Date/Publication: 2024-02-20 23:20:05 UTC
+Date/Publication: 2024-11-05 05:22:34 UTC
